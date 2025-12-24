@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Auto-FreshCheck</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-title">
+        <h1>Auto-FreshCheck</h1>
+        <span class="version">v6.0 IoT + OTA</span>
+      </div>
+      <div class="connection-status" id="connection-status">
+        <span class="status-dot"></span>
+        <span class="status-text">연결 중...</span>
+      </div>
+    </header>
+
+    <!-- Current State -->
+    <section class="state-section">
+      <div class="state-card">
+        <span class="state-label">현재 상태</span>
+        <span class="state-value" id="current-state">IDLE</span>
+        <span class="state-channel" id="current-channel"></span>
+      </div>
+      <div class="timer-card" id="timer-card" style="display: none;">
+        <span class="timer-label">남은 시간</span>
+        <span class="timer-value" id="timer-value">00:00</span>
+      </div>
+    </section>
+
+    <!-- Measurement Values -->
+    <section class="measurements">
+      <h2 class="section-title">측정값</h2>
+      <div class="measurement-grid">
+        <div class="measurement-item">
+          <span class="measurement-label">pH</span>
+          <span class="measurement-value" id="val-ph">--</span>
+          <span class="measurement-unit"></span>
+        </div>
+        <div class="measurement-item">
+          <span class="measurement-label">NH3</span>
+          <span class="measurement-value" id="val-nh3">--</span>
+          <span class="measurement-unit">ppm</span>
+        </div>
+        <div class="measurement-item">
+          <span class="measurement-label">NO2</span>
+          <span class="measurement-value" id="val-no2">--</span>
+          <span class="measurement-unit">ppm</span>
+        </div>
+        <div class="measurement-item phase2-pending">
+          <span class="measurement-label">NO3</span>
+          <span class="measurement-value" id="val-no3">⏳</span>
+          <span class="measurement-unit">Phase2</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab Navigation -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="measure">측정</button>
+      <button class="tab-btn" data-tab="priming">프라이밍</button>
+      <button class="tab-btn" data-tab="manual">수동 제어</button>
+      <button class="tab-btn" data-tab="settings">설정</button>
+    </nav>
+
+    <!-- Tab Contents -->
+    <main class="tab-content">
+      <!-- Measure Tab -->
+      <section id="tab-measure" class="tab-panel active">
+        <div class="measure-buttons">
+          <button class="measure-btn" data-channel="1">
+            <span class="btn-label">pH</span>
+            <span class="btn-desc">수소이온</span>
+          </button>
+          <button class="measure-btn" data-channel="2">
+            <span class="btn-label">NH3</span>
+            <span class="btn-desc">암모니아</span>
+          </button>
+          <button class="measure-btn" data-channel="3" style="display:none;">
+            <span class="btn-label">NH3#2</span>
+            <span class="btn-desc">자동연계</span>
+          </button>
+          <button class="measure-btn" data-channel="4">
+            <span class="btn-label">NO2</span>
+            <span class="btn-desc">아질산염</span>
+          </button>
+        </div>
+        <p class="measure-note">※ 암모니아 테스트는 #1 + #2 시약 순차 투입 (자동)</p>
+        <button class="full-measure-btn" id="btn-measure-all">전체 측정</button>
+      </section>
+
+      <!-- Priming Tab -->
+      <section id="tab-priming" class="tab-panel">
+        <!-- 🔬 광센서 상태 -->
+        <div class="optical-status">
+          <h3>🔬 광센서 상태</h3>
+          <div class="optical-grid">
+            <div class="optical-item">
+              <span class="optical-label">P1 (pH)</span>
+              <span class="optical-value" id="opt-1">--</span>
+            </div>
+            <div class="optical-item">
+              <span class="optical-label">P2 (NH3#1)</span>
+              <span class="optical-value" id="opt-2">--</span>
+            </div>
+            <div class="optical-item">
+              <span class="optical-label">P3 (NH3#2)</span>
+              <span class="optical-value" id="opt-3">--</span>
+            </div>
+            <div class="optical-item">
+              <span class="optical-label">P4 (NO2)</span>
+              <span class="optical-value" id="opt-4">--</span>
+            </div>
+          </div>
+          <button class="refresh-btn" id="btn-refresh-optical">새로고침</button>
+        </div>
+
+        <!-- 프라이밍 모드 선택 -->
+        <div class="priming-mode">
+          <h3>프라이밍 모드</h3>
+          <div class="mode-toggle">
+            <button class="mode-btn active" id="mode-smart">🔬 스마트</button>
+            <button class="mode-btn" id="mode-blind">블라인드</button>
+          </div>
+          <p class="mode-desc" id="mode-description">광센서로 액체 감지 시 자동 정지 (시약 절약!)</p>
+        </div>
+        
+        <div class="priming-buttons">
+          <button class="prime-btn" data-pump="1">
+            <span class="btn-label">펌프 1</span>
+            <span class="btn-desc">pH 시약</span>
+          </button>
+          <button class="prime-btn" data-pump="2">
+            <span class="btn-label">펌프 2</span>
+            <span class="btn-desc">NH3 #1</span>
+          </button>
+          <button class="prime-btn" data-pump="3">
+            <span class="btn-label">펌프 3</span>
+            <span class="btn-desc">NH3 #2</span>
+          </button>
+          <button class="prime-btn" data-pump="4">
+            <span class="btn-label">펌프 4</span>
+            <span class="btn-desc">NO2 시약</span>
+          </button>
+        </div>
+        
+        <button class="full-prime-btn" id="btn-prime-all">전체 프라이밍</button>
+        
+        <div class="priming-stats">
+          <h4>시스템 통계</h4>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <span class="stat-label">총 토출</span>
+              <span class="stat-value" id="stat-dispenses">--</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">성공 측정</span>
+              <span class="stat-value" id="stat-success">--</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Manual Tab -->
+      <section id="tab-manual" class="tab-panel">
+        <div class="control-group">
+          <h3>펌프 제어</h3>
+          <div class="control-buttons">
+            <button class="ctrl-btn" id="btn-sample">샘플 펌프</button>
+            <button class="ctrl-btn" id="btn-waste">폐수 펌프</button>
+          </div>
+        </div>
+        
+        <div class="control-group">
+          <h3>시약 펌프</h3>
+          <div class="reagent-control">
+            <select id="reagent-pump">
+              <option value="1">펌프 1 (pH)</option>
+              <option value="2">펌프 2 (NH3 #1)</option>
+              <option value="3">펌프 3 (NH3 #2)</option>
+              <option value="4">펌프 4 (NO2)</option>
+            </select>
+            <input type="number" id="reagent-steps" value="4500" min="100" max="50000">
+            <button class="ctrl-btn" id="btn-reagent-fwd">정방향</button>
+            <button class="ctrl-btn" id="btn-reagent-rev">역방향</button>
+          </div>
+        </div>
+        
+        <div class="control-group">
+          <h3>교반 / 조명</h3>
+          <div class="control-buttons">
+            <button class="ctrl-btn toggle" id="btn-mixer">교반 모터 OFF</button>
+            <button class="ctrl-btn toggle" id="btn-led">LED OFF</button>
+          </div>
+        </div>
+        
+        <div class="control-group">
+          <h3>카메라</h3>
+          <div class="camera-preview">
+            <img id="camera-img" src="" alt="Camera Preview">
+            <div class="camera-controls">
+              <button class="ctrl-btn" id="btn-capture">촬영</button>
+              <button class="ctrl-btn" id="btn-calibrate-ref">기준점 보정</button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 🎨 색상 분석 -->
+        <div class="control-group">
+          <h3>🎨 색상 분석</h3>
+          <div class="analyze-controls">
+            <select id="analyze-test-type">
+              <option value="ph">pH</option>
+              <option value="nh3">암모니아 (NH3)</option>
+              <option value="no2">아질산 (NO2)</option>
+            </select>
+            <button class="ctrl-btn analyze-btn" id="btn-analyze" disabled>분석 시작</button>
+          </div>
+          <div id="analysis-result" class="analysis-result" style="display:none;"></div>
+        </div>
+      </section>
+
+      <!-- Settings Tab -->
+      <section id="tab-settings" class="tab-panel">
+        <div class="setting-group">
+          <label>교반 시간 (초)</label>
+          <input type="number" id="set-mix-time" value="180" min="30" max="600">
+        </div>
+        
+        <div class="setting-group">
+          <label>샘플 펌프 시간 (ms)</label>
+          <input type="number" id="set-sample-time" value="5000" min="1000" max="30000">
+        </div>
+        
+        <div class="setting-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="set-auto-prime" checked>
+            측정 전 자동 프라이밍
+          </label>
+        </div>
+        
+        <div class="setting-group">
+          <h3>시약 스텝 수 (steps/ml)</h3>
+          <div class="steps-grid">
+            <div>
+              <label>펌프 1 (pH)</label>
+              <input type="number" id="set-steps-1" value="4500">
+            </div>
+            <div>
+              <label>펌프 2 (NH3 #1)</label>
+              <input type="number" id="set-steps-2" value="4500">
+            </div>
+            <div>
+              <label>펌프 3 (NH3 #2)</label>
+              <input type="number" id="set-steps-3" value="4500">
+            </div>
+            <div>
+              <label>펌프 4 (NO2)</label>
+              <input type="number" id="set-steps-4" value="4500">
+            </div>
+          </div>
+        </div>
+        
+        <div class="setting-group">
+          <label>API 주소</label>
+          <input type="text" id="set-api-url" value="http://192.168.4.1">
+        </div>
+        
+        <button class="save-btn" id="btn-save-settings">설정 저장</button>
+      </section>
+    </main>
+
+    <!-- Emergency Stop -->
+    <button class="emergency-btn" id="btn-emergency">긴급 정지</button>
+
+    <!-- History -->
+    <section class="history-section">
+      <h2 class="section-title">측정 기록</h2>
+      <div class="history-list" id="history-list">
+        <div class="history-empty">기록 없음</div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span class="footer-info">Auto-FreshCheck v6.0 | IoT + OTA</span>
+      <span>RHX.LAB</span>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
